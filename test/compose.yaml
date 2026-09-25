@@ -1,0 +1,28 @@
+# Integration test: ./test/run.sh
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: root-secret
+      MARIADB_DATABASE: typo3
+      MARIADB_USER: typo3
+      # Special characters on purpose: exercises option-file escaping
+      MARIADB_PASSWORD: 'p@ss"w\ord#1'
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      retries: 30
+  s3:
+    # S3-compatible server; without an identity config it accepts any credentials
+    image: chrislusf/seaweedfs:latest
+    command: server -s3 -dir=/data
+  runner:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      s3:
+        condition: service_started
+    volumes:
+      - ..:/opt/typo3-backup:ro
+    command: ["bash", "/opt/typo3-backup/test/integration.sh"]
